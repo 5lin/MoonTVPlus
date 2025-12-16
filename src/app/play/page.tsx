@@ -3244,38 +3244,325 @@ function PlayPageClient() {
               handleNextEpisode();
             },
           },
-          // iOS 设备上添加自定义网页全屏按钮（竖屏时显示，横屏时隐藏）
+          // iOS 设备上添加自定义全屏按钮（横屏和竖屏都显示）
           ...(isIOS ? [{
             position: 'right',
             index: 100,  // 大数字确保在设置按钮右边
             html: '<i class="art-icon ios-portrait-fullscreen"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" fill="currentColor"/></svg></i>',
-            tooltip: '网页全屏',
+            tooltip: '全屏',
             style: {
               color: '#fff',
             },
             mounted: function($el: HTMLElement) {
-              // 添加 CSS 样式：横屏时隐藏，竖屏时显示
+              // 添加 CSS 样式：横屏和竖屏都显示
               const style = document.createElement('style');
               style.textContent = `
-                /* 横屏时隐藏 iOS 自定义全屏按钮 */
-                @media (orientation: landscape) {
-                  .ios-portrait-fullscreen {
-                    display: none !important;
-                  }
+                /* iOS 自定义全屏按钮在所有方向都显示 */
+                .ios-portrait-fullscreen {
+                  display: inline-flex !important;
                 }
-                /* 竖屏时显示 iOS 自定义全屏按钮 */
-                @media (orientation: portrait) {
-                  .ios-portrait-fullscreen {
-                    display: inline-flex !important;
-                  }
+                /* iOS 全屏选择对话框样式（遵循项目统一风格） */
+                .ios-fullscreen-dialog {
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  bottom: 0;
+                  background: rgba(0, 0, 0, 0.6);
+                  backdrop-filter: blur(4px);
+                  z-index: 1000;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  padding: 16px;
+                }
+                .ios-fullscreen-dialog-content {
+                  background: white;
+                  border-radius: 16px;
+                  max-width: 480px;
+                  width: 100%;
+                  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                  overflow: hidden;
+                }
+                .dark .ios-fullscreen-dialog-content {
+                  background: rgb(31, 41, 55);
+                }
+
+                /* 标题栏 */
+                .ios-fullscreen-dialog-header {
+                  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                  padding: 20px 24px;
+                }
+                .ios-fullscreen-dialog-title {
+                  font-size: 20px;
+                  font-weight: 700;
+                  color: white;
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  margin-bottom: 6px;
+                }
+                .ios-fullscreen-dialog-title svg {
+                  stroke: white;
+                }
+                .ios-fullscreen-dialog-subtitle {
+                  font-size: 14px;
+                  color: rgba(255, 255, 255, 0.9);
+                  margin: 0;
+                }
+
+                /* 选项列表 */
+                .ios-fullscreen-dialog-options {
+                  padding: 16px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                }
+                .ios-fullscreen-option {
+                  display: flex;
+                  align-items: center;
+                  gap: 16px;
+                  padding: 16px;
+                  background: rgb(249, 250, 251);
+                  border: 2px solid transparent;
+                  border-radius: 12px;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  text-align: left;
+                }
+                .dark .ios-fullscreen-option {
+                  background: rgba(55, 65, 81, 0.5);
+                }
+                .ios-fullscreen-option:hover {
+                  background: rgb(243, 244, 246);
+                  border-color: #22c55e;
+                  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+                }
+                .dark .ios-fullscreen-option:hover {
+                  background: rgb(55, 65, 81);
+                }
+                .ios-fullscreen-option:active {
+                  transform: scale(0.98);
+                }
+
+                /* 推荐选项 */
+                .ios-fullscreen-option-recommended {
+                  border-color: #22c55e;
+                }
+
+                /* 选项图标 */
+                .ios-fullscreen-option-icon {
+                  flex-shrink: 0;
+                  width: 48px;
+                  height: 48px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: white;
+                  border-radius: 10px;
+                  color: #22c55e;
+                }
+                .dark .ios-fullscreen-option-icon {
+                  background: rgb(31, 41, 55);
+                }
+                .ios-fullscreen-option-recommended .ios-fullscreen-option-icon {
+                  background: #22c55e;
+                  color: white;
+                }
+
+                /* 选项内容 */
+                .ios-fullscreen-option-content {
+                  flex: 1;
+                }
+                .ios-fullscreen-option-title {
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: rgb(17, 24, 39);
+                  margin-bottom: 4px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                }
+                .dark .ios-fullscreen-option-title {
+                  color: white;
+                }
+                .ios-fullscreen-option-badge {
+                  display: inline-block;
+                  padding: 2px 8px;
+                  background: #22c55e;
+                  color: white;
+                  font-size: 12px;
+                  font-weight: 500;
+                  border-radius: 4px;
+                }
+                .ios-fullscreen-option-desc {
+                  font-size: 13px;
+                  color: rgb(107, 114, 128);
+                  line-height: 1.4;
+                }
+                .dark .ios-fullscreen-option-desc {
+                  color: rgb(156, 163, 175);
+                }
+
+                /* 箭头图标 */
+                .ios-fullscreen-option-arrow {
+                  flex-shrink: 0;
+                  color: rgb(209, 213, 219);
+                  transition: transform 0.2s;
+                }
+                .dark .ios-fullscreen-option-arrow {
+                  color: rgb(75, 85, 99);
+                }
+                .ios-fullscreen-option:hover .ios-fullscreen-option-arrow {
+                  transform: translateX(4px);
+                  color: #22c55e;
+                }
+
+                /* 底部提示 */
+                .ios-fullscreen-dialog-footer {
+                  padding: 16px 24px;
+                  background: rgb(249, 250, 251);
+                  border-top: 1px solid rgb(229, 231, 235);
+                  display: flex;
+                  align-items: flex-start;
+                  gap: 10px;
+                  font-size: 12px;
+                  color: rgb(107, 114, 128);
+                  line-height: 1.5;
+                }
+                .dark .ios-fullscreen-dialog-footer {
+                  background: rgba(17, 24, 39, 0.5);
+                  border-top-color: rgb(55, 65, 81);
+                  color: rgb(156, 163, 175);
+                }
+                .ios-fullscreen-dialog-footer svg {
+                  flex-shrink: 0;
+                  margin-top: 2px;
+                  stroke: currentColor;
                 }
               `;
               document.head.appendChild(style);
             },
             click: function () {
-              if (artPlayerRef.current) {
-                artPlayerRef.current.fullscreenWeb = !artPlayerRef.current.fullscreenWeb;
+              if (!artPlayerRef.current) return;
+
+              // 如果已经在全屏状态，直接退出
+              if (artPlayerRef.current.fullscreenWeb) {
+                artPlayerRef.current.fullscreenWeb = false;
+                return;
               }
+
+              // 创建对话框（使用项目统一风格）
+              const dialog = document.createElement('div');
+              dialog.className = 'ios-fullscreen-dialog';
+              dialog.innerHTML = `
+                <div class="ios-fullscreen-dialog-content">
+                  <!-- 标题栏 -->
+                  <div class="ios-fullscreen-dialog-header">
+                    <h3 class="ios-fullscreen-dialog-title">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" stroke="currentColor" stroke-width="2" fill="none"/>
+                      </svg>
+                      选择全屏模式
+                    </h3>
+                    <p class="ios-fullscreen-dialog-subtitle">
+                      由于 iOS 系统限制，原生全屏会使用系统播放器，将无法显示弹幕及使用部分播放器功能。网页全屏可能无法完全占满屏幕，但可保留所有功能。
+                    </p>
+                  </div>
+
+                  <!-- 选项列表 -->
+                  <div class="ios-fullscreen-dialog-options">
+                    <!-- 网页全屏选项 -->
+                    <button class="ios-fullscreen-option ios-fullscreen-option-recommended" data-action="web">
+                      <div class="ios-fullscreen-option-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                          <path d="M7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z" fill="currentColor"/>
+                        </svg>
+                      </div>
+                      <div class="ios-fullscreen-option-content">
+                        <div class="ios-fullscreen-option-title">
+                          网页全屏
+                          <span class="ios-fullscreen-option-badge">推荐</span>
+                        </div>
+                        <div class="ios-fullscreen-option-desc">
+                          保留弹幕、控制栏等所有功能
+                        </div>
+                      </div>
+                      <svg class="ios-fullscreen-option-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+
+                    <!-- 原生全屏选项 -->
+                    <button class="ios-fullscreen-option" data-action="native">
+                      <div class="ios-fullscreen-option-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                      </div>
+                      <div class="ios-fullscreen-option-content">
+                        <div class="ios-fullscreen-option-title">
+                          原生全屏
+                        </div>
+                        <div class="ios-fullscreen-option-desc">
+                          使用系统播放器，部分功能不可用
+                        </div>
+                      </div>
+                      <svg class="ios-fullscreen-option-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- 底部提示 -->
+                  <div class="ios-fullscreen-dialog-footer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                      <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>将网站添加到主屏幕（PWA）后，网页全屏可以完全全屏</span>
+                  </div>
+                </div>
+              `;
+
+              // 添加到页面
+              document.body.appendChild(dialog);
+
+              // 点击背景关闭
+              dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                  document.body.removeChild(dialog);
+                }
+              });
+
+              // 按钮点击事件
+              const buttons = dialog.querySelectorAll('.ios-fullscreen-option');
+              buttons.forEach(button => {
+                button.addEventListener('click', () => {
+                  const action = button.getAttribute('data-action');
+
+                  if (action === 'web') {
+                    // 网页全屏
+                    if (artPlayerRef.current) {
+                      artPlayerRef.current.fullscreenWeb = true;
+                    }
+                  } else if (action === 'native') {
+                    // 原生全屏（尝试使用浏览器的全屏 API）
+                    if (artPlayerRef.current && artPlayerRef.current.template.$video) {
+                      const videoElement = artPlayerRef.current.template.$video;
+                      if (videoElement.requestFullscreen) {
+                        videoElement.requestFullscreen();
+                      } else if ((videoElement as any).webkitEnterFullscreen) {
+                        (videoElement as any).webkitEnterFullscreen();
+                      }
+                    }
+                  }
+
+                  // 关闭对话框
+                  document.body.removeChild(dialog);
+                });
+              });
             },
           }] : []),
         ],
@@ -3289,31 +3576,45 @@ function PlayPageClient() {
         setPlayerReady(true);
         console.log('[PlayPage] Player ready, triggering sync setup');
 
-        // iOS 全屏拦截：强制使用 Web 全屏而不是原生全屏
+        // iOS 设备：监听屏幕方向变化，自动调整全屏状态
         if (isIOS && artPlayerRef.current) {
-          console.log('[iOS] 设置全屏拦截，强制使用 Web 全屏');
+          const handleOrientationChange = () => {
+            if (!artPlayerRef.current) return;
 
-          // 保存原始的 fullscreen 属性描述符
-          const player = artPlayerRef.current;
-          const originalFullscreenDescriptor = Object.getOwnPropertyDescriptor(
-            Object.getPrototypeOf(player),
-            'fullscreen'
-          );
+            // 获取当前屏幕方向
+            const isLandscape = window.matchMedia('(orientation: landscape)').matches;
+            const isPortrait = window.matchMedia('(orientation: portrait)').matches;
 
-          // 覆盖 fullscreen 属性，将其重定向到 fullscreenWeb
-          Object.defineProperty(player, 'fullscreen', {
-            get() {
-              return player.fullscreenWeb;
-            },
-            set(value: boolean) {
-              console.log('[iOS] 拦截 fullscreen 设置，重定向到 fullscreenWeb:', value);
-              player.fullscreenWeb = value;
-            },
-            configurable: true,
-            enumerable: true,
+            console.log('[iOS] 屏幕方向变化:', {
+              isLandscape,
+              isPortrait,
+              fullscreenWeb: artPlayerRef.current.fullscreenWeb
+            });
+
+            // 如果在网页全屏状态下旋转到横屏，切换到正常全屏
+            if (artPlayerRef.current.fullscreenWeb && isLandscape) {
+              console.log('[iOS] 横屏模式：从网页全屏切换到正常全屏');
+              // 先退出网页全屏
+              artPlayerRef.current.fullscreenWeb = false;
+              // 延迟一下再进入正常全屏，确保布局已更新
+              setTimeout(() => {
+                if (artPlayerRef.current) {
+                  artPlayerRef.current.fullscreenWeb = true;
+                }
+              }, 100);
+            }
+          };
+
+          // 监听屏幕方向变化
+          window.addEventListener('orientationchange', handleOrientationChange);
+          // 也监听 resize 事件（某些设备上更可靠）
+          window.addEventListener('resize', handleOrientationChange);
+
+          // 清理函数
+          artPlayerRef.current.on('destroy', () => {
+            window.removeEventListener('orientationchange', handleOrientationChange);
+            window.removeEventListener('resize', handleOrientationChange);
           });
-
-          console.log('[iOS] 已覆盖 fullscreen 属性，所有全屏操作将使用 Web 全屏');
         }
 
         // 从 art.storage 读取弹幕设置并应用

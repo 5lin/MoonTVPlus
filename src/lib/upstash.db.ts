@@ -252,6 +252,14 @@ export class UpstashRedisStorage implements IStorage {
     oidcSub?: string,
     enabledApis?: string[]
   ): Promise<void> {
+    // 先检查用户是否已存在（原子性检查）
+    const exists = await withRetry(() =>
+      this.client.exists(this.userInfoKey(userName))
+    );
+    if (exists === 1) {
+      throw new Error('用户已存在');
+    }
+
     const hashedPassword = await this.hashPassword(password);
     const createdAt = Date.now();
 

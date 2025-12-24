@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Heart, Search, X } from 'lucide-react';
+import { Heart, Search, X, Cloud } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 
@@ -4932,7 +4932,7 @@ function PlayPageClient() {
                   className='flex-shrink-0 hover:opacity-80 transition-opacity'
                   title='搜索网盘资源'
                 >
-                  <Search className='h-6 w-6 text-gray-700 dark:text-gray-300' />
+                  <Cloud className='h-6 w-6 text-gray-700 dark:text-gray-300' />
                 </button>
                 {/* 豆瓣评分显示 */}
                 {doubanRating && doubanRating.value > 0 && (

@@ -650,7 +650,15 @@ export abstract class BaseRedisStorage implements IStorage {
     const users = await this.withRetry(() =>
       this.client.zRange(userListKey, 0, -1)
     );
-    return users.map(u => ensureString(u));
+    const userList = users.map(u => ensureString(u));
+
+    // 确保站长在列表中（站长可能不在数据库中，使用环境变量认证）
+    const ownerUsername = process.env.USERNAME;
+    if (ownerUsername && !userList.includes(ownerUsername)) {
+      userList.unshift(ownerUsername);
+    }
+
+    return userList;
   }
 
   // ---------- 管理员配置 ----------

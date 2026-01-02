@@ -16,8 +16,6 @@ export async function GET(request: NextRequest) {
     const config = await getConfig();
     const embyConfig = config.EmbyConfig;
 
-    console.log('[Emby List] EmbyConfig:', JSON.stringify(embyConfig, null, 2));
-
     if (!embyConfig?.Enabled || !embyConfig.ServerURL) {
       return NextResponse.json({
         error: 'Emby 未配置或未启用',

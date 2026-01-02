@@ -3,7 +3,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import CapsuleSwitch from '@/components/CapsuleSwitch';
 import PageLayout from '@/components/PageLayout';
@@ -30,57 +30,126 @@ export default function PrivateLibraryPage() {
   const [source, setSource] = useState<LibrarySource>('openlist');
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const pageSize = 20;
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const isFetchingRef = useRef(false);
 
-  // 切换源时重置页码
+  // 切换源时重置所有状态
   useEffect(() => {
     setPage(1);
+    setVideos([]);
+    setHasMore(true);
+    setError('');
+    isFetchingRef.current = false;
   }, [source]);
 
+  // 加载数据的函数
   useEffect(() => {
+    const fetchVideos = async () => {
+      const isInitial = page === 1;
+
+      // 防止重复请求
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
+
+      try {
+        if (isInitial) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        setError('');
+
+        const endpoint = source === 'openlist'
+          ? `/api/openlist/list?page=${page}&pageSize=${pageSize}`
+          : `/api/emby/list?page=${page}&pageSize=${pageSize}`;
+
+        const response = await fetch(endpoint);
+
+        if (!response.ok) {
+          throw new Error('获取视频列表失败');
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          setError(data.error);
+          if (isInitial) {
+            setVideos([]);
+          }
+        } else {
+          const newVideos = data.list || [];
+
+          if (isInitial) {
+            setVideos(newVideos);
+          } else {
+            setVideos((prev) => [...prev, ...newVideos]);
+          }
+
+          // 检查是否还有更多数据
+          const currentPage = data.page || page;
+          const totalPages = data.totalPages || 1;
+          const hasMoreData = currentPage < totalPages;
+          setHasMore(hasMoreData);
+        }
+      } catch (err) {
+        console.error('获取视频列表失败:', err);
+        setError('获取视频列表失败');
+        if (isInitial) {
+          setVideos([]);
+        }
+      } finally {
+        if (isInitial) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
+        isFetchingRef.current = false;
+      }
+    };
+
     fetchVideos();
-  }, [page, source]);
-
-  const fetchVideos = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const endpoint = source === 'openlist'
-        ? `/api/openlist/list?page=${page}&pageSize=${pageSize}`
-        : `/api/emby/list?page=${page}&pageSize=${pageSize}`;
-
-      const response = await fetch(endpoint);
-
-      if (!response.ok) {
-        throw new Error('获取视频列表失败');
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        setError(data.error);
-        setVideos([]);
-      } else {
-        setVideos(data.list || []);
-        setTotalPages(data.totalPages || 1);
-      }
-    } catch (err) {
-      console.error('获取视频列表失败:', err);
-      setError('获取视频列表失败');
-      setVideos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [source, page]);
 
   const handleVideoClick = (video: Video) => {
     // 跳转到播放页面
     router.push(`/play?source=${source}&id=${encodeURIComponent(video.id)}`);
   };
+
+  // 使用 Intersection Observer 监听滚动
+  useEffect(() => {
+    if (!observerTarget.current) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+
+        // 当目标元素可见且还有更多数据且没有正在加载时，加载下一页
+        if (entry.isIntersecting && hasMore && !loadingMore && !loading && !isFetchingRef.current) {
+          setPage((prev) => prev + 1);
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    const currentTarget = observerTarget.current;
+    observer.observe(currentTarget);
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loadingMore, loading, page]);
 
   return (
     <PageLayout activePath='/private-library'>
@@ -152,30 +221,20 @@ export default function PrivateLibraryPage() {
               ))}
             </div>
 
-            {/* 分页 */}
-            {totalPages > 1 && (
-              <div className='flex justify-center items-center gap-4 mt-8'>
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className='px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors'
-                >
-                  上一页
-                </button>
-
-                <span className='text-gray-700 dark:text-gray-300'>
-                  第 {page} / {totalPages} 页
-                </span>
-
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className='px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors'
-                >
-                  下一页
-                </button>
-              </div>
-            )}
+            {/* 滚动加载指示器 - 始终渲染以便 observer 可以监听 */}
+            <div ref={observerTarget} className='flex justify-center items-center py-8 min-h-[100px]'>
+              {loadingMore && (
+                <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400'>
+                  <div className='w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin' />
+                  <span>加载中...</span>
+                </div>
+              )}
+              {!hasMore && videos.length > 0 && !loadingMore && (
+                <div className='text-gray-500 dark:text-gray-400'>
+                  已加载全部内容
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
